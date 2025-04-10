@@ -1,73 +1,105 @@
-#include <TouchScreen.h> //touch library
-#include <LCDWIKI_GUI.h> //Core graphics library
-#include <LCDWIKI_KBV.h> //Hardware-specific library
-//#include <Servo.h>
-#include <stdint.h>
+#include <MCUFRIEND_kbv.h>
+#include <TouchScreen.h>
 
-//COLORS
-#define BLACK        0x0000  /*   0,   0,   0 */
-#define GREEN        0x07E0  /*   0, 255,   0 */
+// Define color constants
+#define BLACK 0x0000
+#define BLUE 0x001F
+#define RED 0xF800
+#define GREEN 0x07E0
+#define CYAN 0x07FF
+#define MAGENTA 0xF81F
+#define YELLOW 0xFFE0
+#define WHITE 0xFFFF
 
-//The touchscreen functionality of a 2.4'' TFT LCD touchscreen is typically controlled by four pins:
-#define YP A3  
-#define XM A2  
-#define YM 9   
-#define XP 8
+MCUFRIEND_kbv tft;
+uint16_t ID;
 
-//touch sensitivity for X
-#define TS_MINX 516
-#define TS_MAXX 513
+// Touchscreen pin definitions for 2.4" TFT shield
+#define YP A3  // must be analog
+#define XM A2  // must be analog
+#define YM 9   // digital
+#define XP 8   // digital
 
-//touch sensitivity for Y
-#define TS_MINY 489
-#define TS_MAXY 487
+TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
 
-//define the pressure thresholds for detecting a touch
+// Touch pressure threshold
 #define MINPRESSURE 5
 #define MAXPRESSURE 1000
 
-LCDWIKI_KBV mylcd(240,320,A3,A2,A1,A0,A4);
-TouchScreen touch = TouchScreen(XP, YP, XM, YM, 300);
-Servo servo;
+// Touch calibration (adjust if touch position is off)
+#define TS_MINX 150
+#define TS_MAXX 920
+#define TS_MINY 120
+#define TS_MAXY 900
 
-void color(){
-  mylcd.Init_LCD();
-  mylcd.Fill_Screen(BLACK);
-  // RIGHT
-  mylcd.Set_Draw_color(GREEN);
-  mylcd.Fill_Triangle(0, 40, 120, 140, 240, 40);
-  mylcd.Fill_Rect(0, 0, 240, 40, GREEN);
-  mylcd.Set_Draw_color(BLACK);
-  mylcd.Fill_Triangle(20, 0, 120,120 , 220, 0);
-  // LEFT
-  mylcd.Set_Draw_color(GREEN);
-  mylcd.Fill_Triangle(0, 280, 120, 180, 240,280);
-  mylcd.Fill_Rectangle(0,320,240,280);
-  mylcd.Set_Draw_color(BLACK);
-  mylcd.Fill_Triangle(20, 320, 120,200 ,220,320);
-  
+// Screen dimensions
+#define LCD_WIDTH  240
+#define LCD_HEIGHT 320
+
+// Flag for touch state
+bool isTouching = false;
+
+// Function to draw Omnitrix-style UI
+void drawOmnitrixUI() {
+  tft.fillScreen(BLACK);
+
+  // Top green triangle
+  tft.fillTriangle(0, 40, 120, 140, 240, 40, RED);
+  tft.fillRect(0, 0, 240, 40, RED);
+  tft.fillTriangle(20, 0, 120, 120, 220, 0, BLACK); // carve black notch in top
+
+  // Bottom green triangle
+  tft.fillTriangle(0, 280, 120, 180, 240, 280, RED);
+  tft.fillRect(0, 280, 240, 40, RED);
+  tft.fillTriangle(20, 320, 120, 200, 220, 320, BLACK); // carve black notch in bottom
 }
-void aftertouch(){
-  mylcd.Set_Draw_color(GREEN);
-  mylcd.Fill_Circle(120 , 160 ,50);
+
+// Function to draw green circle when touching
+void drawGreenCircle() {
+  tft.fillCircle(120, 160, 50, RED);
+}
+
+// Function to restore center area of UI to its original state
+void clearCircleAreaProperly() {
+  // Repaint only the part under the circle to match original look (no flicker)
+  tft.fillCircle(120, 160, 51, BLACK);
+  
+  // Bottom part of top triangle (fills over green circle)
+  tft.fillTriangle(59, 90, 120, 140, 180, 90, RED);
+
+  // Black notch of top triangle
+  tft.fillTriangle(20, 0, 120, 120, 220, 0, BLACK); 
+  // (80, 60, 120, 120, 160, 60, BLACK);
+  // Top part of bottom triangle
+  tft.fillTriangle(59, 230, 120, 180, 180, 230, RED);
+
+  // Black notch of bottom triangle
+  tft.fillTriangle(20, 320, 120, 200, 220, 320, BLACK);
 }
 
 void setup() {
-  color();
-//   servo.attach(3);
-//   TSPoint p = touch.getPoint();
-//   servo.write(0);
-//   if (p.z > MINPRESSURE && p.z < MAXPRESSURE) { 
-//     servo.write(15);
-//   }
-//   else{servo.write(0);}
+  Serial.begin(9600);
+  ID = tft.readID();      // Detect LCD driver
+  tft.begin(ID);          // Initialize TFT screen
+  drawOmnitrixUI();       // Draw initial UI
 }
-
 
 void loop() {
-  TSPoint p = touch.getPoint();
-  if (p.z > MINPRESSURE && p.z < MAXPRESSURE) { 
-    aftertouch();
-  }
-}
+  TSPoint p = ts.getPoint();         // Read touch input
+  pinMode(XM, OUTPUT);               // Restore pin modes
+  pinMode(YP, OUTPUT);
 
+  // Convert raw touch to screen coordinates
+  bool touchedNow = (p.z > MINPRESSURE && p.z < MAXPRESSURE);
+
+  if (touchedNow && !isTouching) {
+    drawGreenCircle();  // Draw green circle only once when touched
+    isTouching = true;
+  }
+  else if (!touchedNow && isTouching) {
+    clearCircleAreaProperly();  // Restore UI only if previously touched
+    isTouching = false;
+  }
+
+  delay(10); // reduce CPU usage, smooth update
+}
