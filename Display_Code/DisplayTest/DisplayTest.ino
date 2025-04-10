@@ -1,16 +1,28 @@
 #include <TouchScreen.h> //touch library
 #include <LCDWIKI_GUI.h> //Core graphics library
 #include <LCDWIKI_KBV.h> //Hardware-specific library
-#include <Servo.h>
+//#include <Servo.h>
 #include <stdint.h>
 
-
+//COLORS
 #define BLACK        0x0000  /*   0,   0,   0 */
 #define GREEN        0x07E0  /*   0, 255,   0 */
+
+//The touchscreen functionality of a 2.4'' TFT LCD touchscreen is typically controlled by four pins:
 #define YP A3  
 #define XM A2  
 #define YM 9   
 #define XP 8
+
+//touch sensitivity for X
+#define TS_MINX 516
+#define TS_MAXX 513
+
+//touch sensitivity for Y
+#define TS_MINY 489
+#define TS_MAXY 487
+
+//define the pressure thresholds for detecting a touch
 #define MINPRESSURE 5
 #define MAXPRESSURE 1000
 
