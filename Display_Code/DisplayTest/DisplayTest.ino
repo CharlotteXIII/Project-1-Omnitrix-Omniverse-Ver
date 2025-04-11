@@ -28,7 +28,7 @@ uint16_t ID;
 TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
 
 // Touch pressure threshold
-#define MINPRESSURE 5
+#define MINPRESSURE 50
 #define MAXPRESSURE 1000
 
 // Touch calibration (adjust if touch position is off)
@@ -86,6 +86,7 @@ void clearCircleAreaProperly() {
 /////////////////////////////////////////////////////////////////////
 unsigned long touchStartTime = 0;
 bool showSelector = false;
+bool selectorIsSpinning = false; // เพิ่มตัวแปรนี้
 int rotationAngle = 0;
 
 void drawSelectorWheel(int offsetAngle = 0) {
@@ -142,34 +143,41 @@ void setup() {
 }
 
 void loop() {
-  TSPoint p = ts.getPoint();         // Read touch input
-  pinMode(XM, OUTPUT);               // Restore pin modes
+  TSPoint p = ts.getPoint();         
+  pinMode(XM, OUTPUT);
   pinMode(YP, OUTPUT);
 
-  // Convert raw touch to screen coordinates
   bool touchedNow = (p.z > MINPRESSURE && p.z < MAXPRESSURE);
 
   if (touchedNow && !isTouching) {
-    drawGreenCircle();  // Draw green circle only once when touched
-    touchStartTime = millis();  // เริ่มจับเวลา
+    // First touch
+    showSelector = true;                // Show selector immediately
+    selectorIsSpinning = false;         // Not spinning yet
+    drawSelectorWheel(rotationAngle);   // Draw selector once
+    touchStartTime = millis();          // Start hold timer
     isTouching = true;
   }
   else if (touchedNow && isTouching) {
-  if (!showSelector && millis() - touchStartTime > 500) {
-    showSelector = true;  // แสดงหน้าปัด
+    // Check for 0.5s hold to start spinning
+    if (!selectorIsSpinning && millis() - touchStartTime > 500) {
+      selectorIsSpinning = true;
     }
   }
   else if (!touchedNow && isTouching) {
-    clearCircleAreaProperly();  // Restore UI only if previously touched
+    // Released touch → Clear screen and return to UI
+    tft.fillCircle(120, 160, 82, BLACK);  // Clear selector wheel
+    clearCircleAreaProperly();           // Restore UI center
     isTouching = false;
     showSelector = false;
+    selectorIsSpinning = false;
     rotationAngle = 0;
-    drawOmnitrixUI();
+    drawOmnitrixUI();                    // Back to normal UI
   }
 
-  // ถ้าอยู่ในโหมดหมุนหน้าปัด
-  if (showSelector) {
+  // Run rotation animation only if spinning is active
+  if (showSelector && selectorIsSpinning) {
     updateSelectorMotion();
   }
-  delay(10); // reduce CPU usage, smooth update
+
+  delay(10); // Small delay for stability
 }
